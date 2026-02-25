@@ -5,6 +5,57 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+type AuthError = {
+  message?: string;
+  status?: number;
+  code?: string;
+};
+
+function getAuthErrorMessage(error: AuthError) {
+  const rawMessage = (error.message ?? "").toLowerCase();
+  const rawCode = (error.code ?? "").toLowerCase();
+
+  if (
+    rawMessage.includes("user already registered") ||
+    rawMessage.includes("already")
+  ) {
+    return "An account with this email already exists. Please login instead.";
+  }
+
+  if (rawMessage.includes("password should be at least")) {
+    return "Password must be at least 6 characters.";
+  }
+
+  if (rawMessage.includes("signup is disabled") || rawCode === "signup_disabled") {
+    return "Email signup is disabled in Supabase Auth settings.";
+  }
+
+  if (rawMessage.includes("email not confirmed")) {
+    return "Email confirmation is enabled in Supabase. Disable Confirm email in Auth settings to allow direct signup/login.";
+  }
+
+  if (error.status === 422) {
+    return "Signup request is invalid. Check email format and password length.";
+  }
+
+  if (rawMessage.includes("captcha")) {
+    return "Signup is blocked by CAPTCHA settings in Supabase. Disable CAPTCHA or provide a CAPTCHA token.";
+  }
+
+  if (rawMessage.includes("database error saving new user")) {
+    return "Supabase could not save the new user. Check Auth logs for database trigger/function errors.";
+  }
+
+  if (error.status === 400) {
+    return (
+      (error.message && error.message.trim()) ||
+      "Signup failed (400). Check Supabase Auth settings: Email provider enabled, Email signup enabled, and Confirm email disabled."
+    );
+  }
+
+  return (error.message && error.message.trim()) || "Authentication failed. Please try again.";
+}
+
 export default function AuthPage() {
   const supabase = createClient();
 
@@ -13,22 +64,19 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
-  // 🔐 Login: Email + Password
   const handleLogin = async () => {
     setMessage("Logging in...");
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
 
     if (error) {
       if (error.message.toLowerCase().includes("invalid login")) {
         setMessage("Invalid email or password.");
-      } else if (error.message.toLowerCase().includes("email not confirmed")) {
-        setMessage("Please confirm your email before logging in.");
       } else {
-        setMessage(error.message);
+        setMessage(getAuthErrorMessage(error));
       }
       return;
     }
@@ -39,38 +87,60 @@ export default function AuthPage() {
   const handleSignup = async () => {
     setMessage("Creating account...");
 
-    // Try to sign up
-    const { data, error } = await supabase.auth.signUp({
-      email,
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
       password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
     });
 
     if (error) {
-      // Clear & user-friendly messages
-      if (error.message.toLowerCase().includes("already")) {
-        setMessage(
-          "An account with this email already exists. Please login instead.",
-        );
-      } else {
-        setMessage(error.message);
-      }
+      console.error("Supabase signUp error:", {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+      });
+      setMessage(getAuthErrorMessage(error));
       return;
     }
 
-    // Supabase specific case:
-    // If user already exists AND email confirmations are enabled,
-    // it may still return a user object but not create a new account.
-    if (!data.session) {
-      setMessage(
-        "Account created! Please check your email to confirm your account before logging in.",
-      );
-    } else {
-      setMessage("Signup successful. Redirecting...");
-      window.location.href = "/dashboard";
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (loginError) {
+      setMessage(getAuthErrorMessage(loginError));
+      return;
     }
+
+    setMessage("Signup successful. Redirecting...");
+    window.location.href = "/dashboard";
+  };
+
+  const onAuthAction = async () => {
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail || !password) {
+      setMessage("Email and password are required.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      setMessage("Please enter a valid email address.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (isLogin) {
+      await handleLogin();
+      return;
+    }
+
+    await handleSignup();
   };
 
   return (
@@ -102,7 +172,7 @@ export default function AuthPage() {
 
           <Button
             className="w-full"
-            onClick={isLogin ? handleLogin : handleSignup}
+            onClick={onAuthAction}
           >
             {isLogin ? "Sign In" : "Create Account"}
           </Button>
