@@ -3,6 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTask, updateTask } from "@/actions/task.actions";
+import {
+  TASK_DESCRIPTION_MAX_LENGTH,
+  TASK_TITLE_MAX_LENGTH,
+} from "@/lib/validations/task.schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +69,7 @@ export function TaskCard({ task }: { task: Task }) {
           <Input
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
+            maxLength={TASK_TITLE_MAX_LENGTH}
           />
         ) : (
           <CardTitle className="text-lg">{task.title}</CardTitle>
@@ -76,6 +81,7 @@ export function TaskCard({ task }: { task: Task }) {
           <Textarea
             value={draftDescription}
             onChange={(e) => setDraftDescription(e.target.value)}
+            maxLength={TASK_DESCRIPTION_MAX_LENGTH}
           />
         ) : (
           task.description && (

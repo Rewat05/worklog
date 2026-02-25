@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { taskSchema, TaskInput } from "@/lib/validations/task.schema";
+import {
+  taskSchema,
+  TaskInput,
+  TASK_DESCRIPTION_MAX_LENGTH,
+  TASK_TITLE_MAX_LENGTH,
+} from "@/lib/validations/task.schema";
 import { createTask } from "@/actions/task.actions";
 
 import {
@@ -75,6 +80,7 @@ export function CreateTaskDialog() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Input
             placeholder="What did you work on today?"
+            maxLength={TASK_TITLE_MAX_LENGTH}
             {...form.register("title")}
           />
           {form.formState.errors.title && (
@@ -85,8 +91,14 @@ export function CreateTaskDialog() {
 
           <Textarea
             placeholder="Summary, blockers, outcomes..."
+            maxLength={TASK_DESCRIPTION_MAX_LENGTH}
             {...form.register("description")}
           />
+          {form.formState.errors.description && (
+            <p className="text-sm text-red-500">
+              {form.formState.errors.description.message}
+            </p>
+          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium">

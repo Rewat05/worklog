@@ -14,7 +14,7 @@ export async function createTask(formData: FormData) {
 
   const validated = taskSchema.safeParse({ title, description });
   if (!validated.success) {
-    return { error: "Invalid form data" };
+    return { error: validated.error.issues[0]?.message ?? "Invalid form data" };
   }
 
   const {
@@ -108,7 +108,7 @@ export async function updateTask(taskId: string, title: string, description: str
 
   const validated = taskSchema.safeParse({ title, description });
   if (!validated.success) {
-    return { error: "Invalid form data" };
+    return { error: validated.error.issues[0]?.message ?? "Invalid form data" };
   }
 
   const {
